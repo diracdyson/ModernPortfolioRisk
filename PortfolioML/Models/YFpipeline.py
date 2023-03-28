@@ -12,8 +12,9 @@ class Pipe():
     def __init__(self,interval = '1d'):
         # consider the top 10 holdings of the SPY
         # include the SPY for portfolio diversity tech growth
-        self.period =3
+        self.period =5
         period = str(self.period)+'y'
+        self.targetcol = '1DayRet_'+'Close'
         
         self.tickers = ['TSLA', 'AAPL','MSFT','AMZN','NVDA','GOOGL','SPY']
         self.feat = ['High','Low','Close','Volume']
@@ -73,12 +74,12 @@ class Pipe():
         self.X = pd.DataFrame(MinMaxScaler().fit_transform(self.X),columns = col)
 
        # print(self.X.values)
-        print(self.X.shape)
+    #    print(self.X.shape)
 
         return self.X
 
     def PctChangeAndVol(self,bins =100) -> pd.DataFrame():
-        print(self.X.shape)
+       # print(self.X.shape)
         cnt = 0
         
         self.X  = self.X.dropna()
@@ -144,22 +145,21 @@ class Pipe():
         return self.X
     
     def RemoveFeat(self) -> pd.DataFrame():
-        print(self.X.shape)
+        
         self.X = self.X.drop( self.feat, axis=1 )
-        print(self.X.shape)
+        
 
         return self.X
     
 
-
-    def PCASVD(self,expvar = 0.90)-> pd.DataFrame():
+    @staticmethod
+    def PCASVD(X,expvar = 0.90)-> pd.DataFrame():
         pca = PCA(n_components= expvar , random_state=0,svd_solver='auto')
-        col = self.X
-        self.X = pd.DataFrame(pca.fit_transform(self.X))
-        #print(" the number of components {}".format(len(pca.explained_variance_ratio_)))
-        print(self.X.shape)
-        print(self.X.values )
-        return self.X
+       
+        X = pd.DataFrame(pca.fit_transform(X))
+        print(" the number of components {}".format(len(pca.explained_variance_ratio_)))
+        
+        return X
     
 
     
@@ -167,7 +167,7 @@ class Pipe():
     
 
 
-#p = Pipe()
+p = Pipe()
 #p.PctChangeAndVol()
 #p.RemoveFeat()
 #p.NormalizeFeat()
