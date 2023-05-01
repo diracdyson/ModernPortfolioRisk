@@ -1,0 +1,5 @@
+import pandas as pd
+f= pd.DataFrame([[2,3,4],
+                 [2,3,4],
+                 [2,3,4]],columns=  ['girls','boys','trans'])
+print(f**2)

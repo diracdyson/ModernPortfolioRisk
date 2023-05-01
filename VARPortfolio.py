@@ -29,7 +29,7 @@ class TimeSeriesModels():
        # self.X = p.PCASVD()
         self.InvTransform = pd.DataFrame(index = np.arange(0,self.X.shape[0], 1))
 
-        for c in self.X.columns:
+        for c in self.X.drop('MacroData',axis =1).columns:
             f = Frac()
             currf = np.array(f.OGfrac(self.X[c].values.reshape(-1,1),d)).reshape(-1,1)
             self.InvTransform[c] = self.X[c].values.reshape(-1,1) - currf
@@ -47,6 +47,7 @@ class TimeSeriesModels():
         self.tickers = ['TSLA', 'AAPL','MSFT','AMZN','NVDA','GOOGL','SPY']
         self.targetcol = '1DayRet_'+'Close'
         self.DickeyFullerStation(self.X)
+        
 
       #  self.GrangerTest(self.X)
 
@@ -125,7 +126,7 @@ class TimeSeriesModels():
 
         model_var = VAR(endog ,exog = self.X.drop(self.targetcol ,axis = 1).values)
 
-        fit = model_var.fit(maxlags = 10,ic = 'aic')
+        fit = model_var.fit(maxlags = 4,ic = 'aic')
 
         lag_order = fit.k_ar
 
