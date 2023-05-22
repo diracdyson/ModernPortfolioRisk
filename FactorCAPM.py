@@ -9,6 +9,7 @@ from scipy.linalg import toeplitz
 
 class CAPM():
     def __init__(self):
+        
         p = Pipe()
         self.X = p.LogCAPM()
      #   p.PctChangeAndVol()
@@ -187,6 +188,8 @@ class CAPM():
         
         print('For a portfolio composed of {} stocks in SPY with weighting given by Beta {}'.format(6,betasharperatio))
         print('SPY Sharpe Ratio {}'.format(spyfundsharperatio))
+
+
         
         # ofc increasing tickers and exposure to economy will increase SHARPE and results confirmed as SPY currently has SHARPE ~ 0.6
 

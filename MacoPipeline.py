@@ -9,11 +9,7 @@ from sklearn.preprocessing import StandardScaler
 class MacroPipeline():
     def __init__(self):
         def download(codes,date2):
-          #  date1 = date.today()
-           # print(date1)
-         #   newyear= date1.year - 10 
-         #   date2 = datetime(newyear,5,1)
-
+      
                                                                                                                                                       
 
             key='bb358fb7479df683ef3c8fb6df7c3ebf'
@@ -25,10 +21,7 @@ class MacroPipeline():
     
             return macro
 
-        
-       # macro=macro.resample('MS').ffill().dropna()
-      #  print(macro.tail())
-      #  print(macro.index[0])
+   
         period = '10y'
         interval = '1mo'
         self.tickers = ['TSLA', 'AAPL','MSFT','AMZN','NVDA','GOOGL','SPY']
@@ -37,8 +30,10 @@ class MacroPipeline():
 
         codes={'Corporate': 'BAA10Y','10Y':'DGS10','1Y': 'DGS1'}
         macro = download( codes,self.X.index[0]).resample('MS').ffill()
+
        #macro=download(codes)
         macro.columns=list(codes.keys())
+
 
        # macro['Time']=((macro['10Y']-macro['1Y'])/((macro['10Y']).expanding().mean()))*100
         macro['Confidence']=((macro['10Y']-macro['Corporate'])/((macro['10Y']).expanding().mean()))*100
@@ -47,11 +42,12 @@ class MacroPipeline():
 
         print(self.X.index[0])
         print(macro.index[0])
+
         
      #   print(macro.head())
      #   print(self.X.shape)
         newjawn = pd.concat([macro,self.X],axis =1)
-        print(newjawn.head())
+        print(newjawn.head()) 
 
 
 m = MacroPipeline()

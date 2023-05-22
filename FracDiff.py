@@ -24,7 +24,7 @@ class Frac():
             weights[k - 1] = weights[k - 2] * (k - 1 - d) / k
 
     # difference series
-        ydiff = list(x)
+        ydiff = (x)
 
         for i in range(0, n):
             dat = x[:i]
@@ -32,6 +32,78 @@ class Frac():
             ydiff[i] = x[i] + np.dot(w, dat[::-1])
 
         return ydiff
+#---------------------------------------------------------------------------------------------------   
+    def FindOptFracd(self,x):
+        
+        fgrid = np.arange(0.15,0.99,0.01)
+        ad=[]
+        d= []
+        inf = 0
+        for ds in fgrid:
+
+            ydiff = np.array(self.OGfrac(x,ds)).reshape(-1,1)
+            #print(ydiff)
+            ads=adfuller(ydiff)[1] 
+            
+            if ads<= 0.05:
+                
+                d.append(ds)
+                ad.append(ads)
+        
+        ad= np.array(ad)
+        d= np.array(d)  
+           
+        if d.shape[0]==0:
+            
+            return fgrid[0]
+        
+        else:
+    
+            id= np.argsort(-ad)
+            optid =id[0]
+
+            return d[optid]
+            
+#---------------------------------------------------------------------------------------------------   
+    
+
+    def FindOptFracdOld(self,x):
+        
+        fgrid = np.arange(0.15,0.85,0.01)
+        corr=[]
+        ds= []
+        for d in fgrid:
+
+            ydiff = np.array(self.OGfrac(x,d)).reshape(-1,1)
+            #print(ydiff)
+            
+            if adfuller(ydiff)[1] <= 0.05:
+                
+                ds.append(d)
+             #   cr= np.corrcoef(x,ydiff)[0,1]
+            #    corr.append(cr)
+        
+        corr= np.array(corr)
+        ds= np.array(ds)      
+        
+        #id= np.argsort(-corr)
+        #optid =id[0]
+        if ds.shape[0]==0:
+            return fgrid[0]
+        else:
+        #ans = ds[optid]
+            return np.min(ds)
+        #print(ans.shape)
+
+      #  if len( id )==0:
+         #   return fgrid[0]
+        
+      #  else:
+      #      
+
+
+
+
     
     @staticmethod
     def getWeights(d, lags):

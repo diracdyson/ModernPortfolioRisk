@@ -15,11 +15,9 @@ from statsmodels.tsa.api import ARDL
 from statsmodels.tsa.ardl import ardl_select_order
 from arch.univariate import ARX, StudentsT, GARCH
 
-
-
 class TimeSeriesModels():
     
-    def __init__(self,lagd= False,d=0.35):
+    def __init__(self,lagd= False,d=0.35,perc = 0.75):
         
       #  p = Pipe()
      #   p.LogChange()
@@ -32,6 +30,7 @@ class TimeSeriesModels():
         p.LogChange()
         p.PctChangeAndVol()
         self.X =  p.RemoveFeat()
+        self.X= p.RemoveOtherFeat()
         self.copy= self.X.copy()
         
        # self.X.loc[:,('20DayRet_Close', 'TSLA')] = np.log(self.X.loc[:,('20DayRet_Close', 'TSLA')]) - np.log(self.X.loc[:,('20DayRet_Close', 'TSLA')].shift(1))
@@ -41,26 +40,21 @@ class TimeSeriesModels():
        # self.KPSSStation(self.X)
         self.InvTransform = pd.DataFrame(index = np.arange(0,self.X.shape[0], 1))
 
-        for c in self.X.drop('MacroData',axis =1).columns:
+        for c in self.X.drop('MacroData',axis=1).columns:
             f = Frac()
-            currf = np.array(f.OGfrac(self.X[c].values.reshape(-1,1),d)).reshape(-1,1)
-            self.InvTransform[c] = self.X[c].values.reshape(-1,1) - currf
+            col = self.X[c].values.reshape(-1,1)
+            #print(col)
+            d=f.FindOptFracd(col)
+            print(d)
+            currf = np.array(f.OGfrac(col,d)).reshape(-1,1)
+            self.InvTransform[c] =  col - currf
             self.X[c] = currf
 
 
+        self.X = self.DickeyFullerStation(self.X)
         #self.X = self.X.drop('MarcoData',axis =1 )
-
-
         print(self.InvTransform.values.shape)
-
-
-
-
-        
-
         #print()
-            
-
 
         self.X = self.X.dropna()
 
@@ -74,11 +68,8 @@ class TimeSeriesModels():
         
         self.X_c = self.X.copy()
         self.ppath = '/Users/teacher/Desktop/PortfolioML/Models/predss/' 
-        self.X_test = self.X.iloc[int(0.7* self.X.shape[0]):self.X.shape[0],:]
-        self.X=self.X.iloc[0:int(0.7* self.X.shape[0]),:]
-
-
-
+        self.X_test = self.X.iloc[int(perc* self.X.shape[0]):self.X.shape[0],:]
+        self.X=self.X.iloc[0:int(perc* self.X.shape[0]),:]
 
        # self.DickeyFullerStation(self.X)
         self.tickers = ['TSLA', 'AAPL','MSFT','AMZN','NVDA','GOOGL','SPY']
@@ -137,8 +128,11 @@ class TimeSeriesModels():
                 print("Stationary feature {} with p-value {}".format(feature,pvalue[i]))
                 i+=1
             else:
+                X=X.drop(feature,axis=1)
                 print("Non-Stationary feature {} with p-value {}".format(feature,pvalue[i]))
                 i+=1
+
+        return X 
 
 
     
@@ -177,7 +171,7 @@ class TimeSeriesModels():
             stepwise_fit = pm.auto_arima(self.X.loc[:,(self.targetcol,t)].values.reshape(-1,1), start_p=1, start_q=1,
                              max_p=3, max_q=3, m=1,
                              start_P=0, seasonal=False,
-                             d=1, D=0, trace=True,
+                             d=2, D=0, trace=True,
                              error_action='trace',
                              suppress_warnings=True, 
                              stepwise=True) 
@@ -214,7 +208,6 @@ class TimeSeriesModels():
                 
                 forecastsrobust.append(fc)
                 confidence_intervalsrobust.append(conf)
-    
     
                 model_a.update(new_ob)
 
@@ -277,9 +270,6 @@ class TimeSeriesModels():
         predictions = pd.DataFrame(index = ts)
         #ids = []
        # for t in self.tickers:
-            
-
-
         #ids = np.array(ids)
 
         for t in self.tickers:
@@ -387,11 +377,6 @@ class TimeSeriesModels():
         predictions.to_csv(self.ppath + 'ARDL'+'_forecast_'+filex,index = False)
        # plt.show()
 
-        
-
-
-
-
     def ARXGARCH(self,filex = '.csv'):
         cnt = 0 
         fig, ax = plt.subplots(len(self.tickers), 1, figsize=(12, 12))
@@ -415,8 +400,6 @@ class TimeSeriesModels():
             self.X_cn = pd.DataFrame(index = np.arange(0,self.X_c.shape[0],1))
 
 
-
-            
             dicttest= dict()
             for c in self.X_test.drop((self.targetcol,t),axis =1).columns:
                 self.X_newexog[c[0]+c[1]] = self.X[c].values
@@ -425,16 +408,13 @@ class TimeSeriesModels():
                 self.X_cn[c[0]+c[1]]  = self.X_c[c].values.reshape(-1,1)
                   
 
-                
-
+    
             ar = ARX(self.X.loc[:,(self.targetcol,t)].values.reshape(-1,1), x =self.X_newexog, lags = [1,2,3,4])
             ar.volatility = GARCH(p=1, q=1,o = 0)
             ar.distribution = StudentsT()
             model_a = ar.fit(update_freq= 1, disp='off')
 
 
-
-            
             result =  model_a.forecast(horizon=y_test.shape[0],x =dicttest ,reindex = False) 
             print( model_a.summary())
             forecastrobust = result.mean.values.reshape(-1,1) - self.InvTransform[(self.targetcol,t)][self.X.shape[0]:self.X.shape[0]+ self.X_test.shape[0]].values.reshape(-1,1)
@@ -453,8 +433,8 @@ class TimeSeriesModels():
 #
 
             predictions[t+'_forecast_'] = forecastrobust 
-            ax[cnt].plot(ts,forecastrobust/100 ,marker ='o',c = 'r',label='Simulations: ARDL-GARCH ')
-            ax[cnt].plot(ts,y_test/100,c='b',label='Actual ')
+            ax[cnt].plot(ts,forecastrobust ,marker ='o',c = 'r',label='Simulations: ARDL-GARCH ')
+            ax[cnt].plot(ts,y_test,c='b',label='Actual ')
         #    ax[cnt].plot(ts,cond_var,c ='g',label= ' Var of residual')
             
            # ax[cnt].fill_between(ts, lower_ci,upper_ci, color ='orange',label="Confidence Intervals")

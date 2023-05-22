@@ -13,8 +13,13 @@ from scipy import stats
 from statsmodels.tsa.stattools import adfuller
 from FracDiff import Frac
 from statsmodels.stats.diagnostic import linear_reset as regreset
+#from chow_test import chowtest
+
+
+
+
 class Forecast():
-    def __init__(self, d= 0.25 , tau = 1e-3):
+    def __init__(self, d= 0.35 , perc = 0.75):
         self.targetcol = '1DayRet_'+'Close'
         self.tickers = ['TSLA', 'AAPL','MSFT','AMZN','NVDA','GOOGL','SPY']
         
@@ -24,34 +29,47 @@ class Forecast():
         p.LogChange()
         p.PctChangeAndVol()
         self.X =  p.RemoveFeat()
-        self.copy= self.X.copy()
+        self.X = p.RemoveOtherFeat()
+        self.copy= self.X.copy()        
+
+        print(self.X.head())
 
        # self.X.loc[:,('20DayRet_Close', 'TSLA')] = np.log(self.X.loc[:,('20DayRet_Close', 'TSLA')]) - np.log(self.X.loc[:,('20DayRet_Close', 'TSLA')].shift(1))
       #  self.X = self.X.dropna()
 
         self.InvTransform = pd.DataFrame(index = np.arange(0,self.X.shape[0], 1))
-
+        np.seterr(invalid='ignore')
         for c in self.X.drop('MacroData',axis =1).columns:
             f = Frac()
-            currf = np.array(f.OGfrac(self.X[c].values.reshape(-1,1),d)).reshape(-1,1)
-            self.InvTransform[c] = self.X[c].values.reshape(-1,1) - currf
+            col = self.X[c].values.reshape(-1,1)
+            #print(col)
+            d=f.FindOptFracd(col)
+            print(d)
+            currf = np.array(f.OGfrac(col,d)).reshape(-1,1)
+            self.InvTransform[c] =  col - currf
             self.X[c] = currf
             #print('shape of frac diff {}'.format(np.array(f.OGfrac(self.X[c].values.reshape(-1,1),d)).shape))
             #print('orignal {}'.format(self.X[c].values.reshape(-1,1).shape))
             #print(np.array(f.OGfrac(self.X[c].values.reshape(-1,1),d)).reshape(-1,1).shape)
             
 
-        self.X= self.X.dropna()
+        #self.X= self.X.dropna()
+
+        print(self.X.isnull().sum())
+        
+        # remove nonstaionary feat after trans
+        self.DickeyFullerStation(self.X)
+
+        print('first')
+
+        print(self.X.head())
+
         
         self.X_c = self.X.copy()
         self.ppath = '/Users/teacher/Desktop/PortfolioML/Models/predss/' 
-        self.X_test = self.X.iloc[int(0.7* self.X.shape[0]):self.X.shape[0],:]
-        self.X=self.X.iloc[0:int(0.7* self.X.shape[0]),:]
-
-
-        self.DickeyFullerStation(self.X)
-        print(self.X.head())
-
+        self.X_test = self.X.iloc[int(perc* self.X.shape[0]):self.X.shape[0],:]
+        self.X=self.X.iloc[0:int(perc* self.X.shape[0]),:]
+        print(self.X.shape)
        # print(self.X.values)
     
     @staticmethod
@@ -91,9 +109,13 @@ class Forecast():
             if  pvalue[i] <= 0.05:
                 print("Stationary feature {} with p-value {}".format(feature,pvalue[i]))
                 i+=1
+
             else:
                 print("Non-Stationary feature {} with p-value {}".format(feature,pvalue[i]))
                 i+=1
+                X= X.drop(feature,axis= 1)
+        
+        return X
 
 
     @staticmethod
@@ -127,7 +149,12 @@ class Forecast():
 
            # print(self.X.loc[:,(self.targetcol,t)])
 
-            m = sm.OLS(self.X.loc[:,(self.targetcol,t)],sm.add_constant(self.X.drop(t,axis =1,level=1 )))
+            m = sm.OLS(self.X.loc[:,(self.targetcol,t)].shift(1).fillna(self.X.loc[:,(self.targetcol,t)].mean()),sm.add_constant(self.X.drop((self.targetcol,t),axis =1)))
+
+        #    c = chowtest(y=self.X.loc[:,(self.targetcol,t)], X=self.X.drop(t,axis =1,level=1 ),
+        #    last_index_in_model_1=int(self.X.shape[0]/2),
+         #   first_index_in_model_2=int(self.X.shape[0]/2) +1 ,
+         #   significance_level=.05)
  
             fit = m.fit() 
 
@@ -156,21 +183,13 @@ class Forecast():
            #     else:
                     
            #         pass 
-
-
-                
-                
             
-            pred = fit.predict(sm.add_constant(self.X_test.drop(t,axis = 1,level=1))).values.reshape(-1,1)  + self.InvTransform[(self.targetcol,t)][self.X.shape[0]:self.X.shape[0]+ self.X_test.shape[0]].values.reshape(-1,1)
+            pred = fit.predict(sm.add_constant(self.X_test.drop((self.targetcol,t),axis=1))).values.reshape(-1,1)  + self.InvTransform[(self.targetcol,t)][self.X.shape[0]:self.X.shape[0]+ self.X_test.shape[0]].values.reshape(-1,1)
             
-            
-            
-
+        
                 # H_o: model has no omitted variables 
-
-
                 
-            y_test = self.X_test.loc[:,(self.targetcol,t)].values.reshape(-1,1)  + self.InvTransform[(self.targetcol,t)][self.X.shape[0]:self.X.shape[0]+ self.X_test.shape[0]].values.reshape(-1,1)
+            y_test = self.X_test.loc[:,(self.targetcol,t)].shift(1).fillna(self.X_test.loc[:,(self.targetcol,t)].mean()).values.reshape(-1,1)  + self.InvTransform[(self.targetcol,t)][self.X.shape[0]:self.X.shape[0]+ self.X_test.shape[0]].shift(1).fillna(self.InvTransform[(self.targetcol,t)].mean()).values.reshape(-1,1)
             y_testa = self.copy[(self.targetcol,t)][self.X.shape[0]:self.X.shape[0]+ self.X_test.shape[0]]
             print( pred)
             print(y_test)
@@ -182,7 +201,7 @@ class Forecast():
 
            # print('For ticker {} the MSE is {}'.format(t,MSE))
 
-            lower_ci , upper_ci = self.ols_quantile(fit, sm.add_constant(self.X_test.drop(t,axis = 1,level=1)))
+            lower_ci , upper_ci = self.ols_quantile(fit, sm.add_constant(self.X_test.drop((self.targetcol,t),axis = 1)))
            #print(lower_ci.shape)
 
             lower_ci= lower_ci.values.reshape(-1,1) + self.InvTransform[(self.targetcol,t)][self.X.shape[0]:self.X.shape[0]+ self.X_test.shape[0]].values.reshape(-1,1)
@@ -296,17 +315,14 @@ class Forecast():
             print(gls_fit.summary())
             predictions[t+'_forecast_'] = pred
         
-        
         predictions.to_csv(self.ppath+self.mnames[1]+'_forecast_'+filex,index = False)
-
-
-        
+       
         plt.show()
 
 
 
 f = Forecast() 
 
-#f.LR()
+f.LR()
 
-f.GLS()
+#f.GLS()
